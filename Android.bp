@@ -18,8 +18,10 @@ cc_library_shared {
     whole_static_libs: ["drm_hwcomposer"],
     srcs: [
         "platformstm32mpu.cpp",
+        ":drm_hwcomposer_platformgeneric"
     ],
     include_dirs: ["device/stm/stm32mp1/peripheral/allocator",
-                   "external/drm_hwcomposer"],
+                   "external/drm_hwcomposer",
+                   "external/drm_hwcomposer/platform"],
     cppflags: ["-DUSE_STM32MPU_IMPORTER"],
 }

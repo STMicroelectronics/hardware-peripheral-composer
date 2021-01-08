@@ -19,30 +19,20 @@
 
 #include "drmdevice.h"
 #include "platform.h"
-
-#include <hardware/gralloc.h>
+#include "platformdrmgeneric.h"
 
 namespace android {
 
-class DrmStm32mpuImporter : public Importer {
+class DrmStm32mpuImporter : public DrmGenericImporter {
  public:
-  DrmStm32mpuImporter(DrmDevice *drm);
-  ~DrmStm32mpuImporter() override;
+  using DrmGenericImporter::DrmGenericImporter;
 
-  int Init();
-
-  int ImportBuffer(buffer_handle_t handle, hwc_drm_bo_t *bo) override;
-  int ReleaseBuffer(hwc_drm_bo_t *bo) override;
-  bool CanImportBuffer(buffer_handle_t handle) override;
+  int ConvertBoInfo(buffer_handle_t handle, hwc_drm_bo_t *bo) override;
 
  private:
   uint32_t ConvertHalFormatToDrm(uint32_t hal_format);
   uint32_t ConvertDrmFormatToHal(uint32_t drm_format);
   uint32_t GetBpp(uint32_t hal_format);
-
-  DrmDevice *drm_;
-
-  const gralloc_module_t *gralloc_;
 };
 }
 

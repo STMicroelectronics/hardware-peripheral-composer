@@ -31,8 +31,7 @@ class DrmStm32mpuImporter : public DrmGenericImporter {
 
  private:
   uint32_t ConvertHalFormatToDrm(uint32_t hal_format);
-  uint32_t ConvertDrmFormatToHal(uint32_t drm_format);
-  uint32_t GetBpp(uint32_t hal_format);
+  uint32_t HalFormatToBitsPerPixel(uint32_t hal_format);
 };
 }
 

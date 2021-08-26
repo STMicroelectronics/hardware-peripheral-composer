@@ -66,27 +66,7 @@ uint32_t DrmStm32mpuImporter::ConvertHalFormatToDrm(uint32_t hal_format) {
   }
 }
 
-uint32_t DrmStm32mpuImporter::ConvertDrmFormatToHal(uint32_t drm_format) {
-  switch (drm_format) {
-    case DRM_FORMAT_RGB888:
-      return HAL_PIXEL_FORMAT_RGB_888;
-    case DRM_FORMAT_ARGB8888:
-      return HAL_PIXEL_FORMAT_BGRA_8888;
-    case DRM_FORMAT_XRGB8888:
-      return HAL_PIXEL_FORMAT_RGBX_8888;
-    case DRM_FORMAT_ABGR8888:
-      return HAL_PIXEL_FORMAT_RGBA_8888;
-    case DRM_FORMAT_RGB565:
-      return HAL_PIXEL_FORMAT_RGB_565;
-    case DRM_FORMAT_YVU420:
-      return HAL_PIXEL_FORMAT_YV12;
-    default:
-      ALOGE("Cannot convert drm format to hal format %u", drm_format);
-      return -EINVAL;
-  }
-}
-
-uint32_t DrmStm32mpuImporter::GetBpp(uint32_t hal_format)
+uint32_t DrmStm32mpuImporter::HalFormatToBitsPerPixel(uint32_t hal_format)
 {
     uint32_t bpp;
 
@@ -113,13 +93,6 @@ uint32_t DrmStm32mpuImporter::GetBpp(uint32_t hal_format)
     return bpp;
 }
 
-// check usage validity (HW_FB or no SW read/write access)
-static bool isUsageValid(int usage) {
-  return ((usage & GRALLOC_USAGE_HW_FB) == GRALLOC_USAGE_HW_FB) ||
-  (((usage & GRALLOC_USAGE_SW_READ_MASK) == GRALLOC_USAGE_SW_READ_NEVER) &&
-  ((usage & GRALLOC_USAGE_SW_WRITE_MASK) == GRALLOC_USAGE_SW_WRITE_NEVER));
-}
-
 int DrmStm32mpuImporter::ConvertBoInfo(buffer_handle_t handle, hwc_drm_bo_t *bo) {
 
   private_handle_t *gr_handle = (private_handle_t*)handle;
@@ -128,14 +101,17 @@ int DrmStm32mpuImporter::ConvertBoInfo(buffer_handle_t handle, hwc_drm_bo_t *bo)
 
   memset(bo, 0, sizeof(hwc_drm_bo_t));
 
-  if (! isUsageValid(gr_handle->usage))
-    return -EPERM;
+  /* Extra bits are responsible for buffer compression and memory layout */
+  if (gr_handle->format & ~0x10f) {
+    ALOGV("Special buffer formats are not supported");
+    return -EINVAL;
+  }
 
   bo->width = gr_handle->width;
   bo->height = gr_handle->height;
   bo->format = ConvertHalFormatToDrm(gr_handle->format);
 
-  uint32_t bpp = GetBpp(gr_handle->format);
+  uint32_t bpp = HalFormatToBitsPerPixel(gr_handle->format);
   bo->pitches[0] = gr_handle->stride * bpp;
 
   bo->prime_fds[0] = gr_handle->fd;
@@ -144,38 +120,10 @@ int DrmStm32mpuImporter::ConvertBoInfo(buffer_handle_t handle, hwc_drm_bo_t *bo)
   return 0;
 }
 
-class PlanStageStm32mpu : public Planner::PlanStage {
-  public:
-  int ProvisionPlanes(std::vector<DrmCompositionPlane> *composition,
-                      std::map<size_t, DrmHwcLayer *> &layers, DrmCrtc *crtc,
-                      std::vector<DrmPlane *> *planes) {
-    int layers_added = 0;
-    // Fill up the remaining planes
-    for (auto i = layers.begin(); i != layers.end(); i = layers.erase(i)) {
-      if (! isUsageValid(i->second->gralloc_buffer_usage))
-        continue;
-
-        int ret = Emplace(composition, planes, DrmCompositionPlane::Type::kLayer,
-                        crtc, std::make_pair(i->first, i->second));
-        layers_added++;
-      // We don't have any planes left
-      if (ret == -ENOENT)
-        break;
-      else if (ret)
-        ALOGE("Failed to emplace layer %zu, dropping it", i->first);
-    }
-    // If we didn't emplace anything, return an error to ensure we force client
-    // compositing.
-    if (!layers_added)
-      return -EINVAL;
-    return 0;
-  }
-};
-
 #ifdef USE_STM32MPU_IMPORTER
 std::unique_ptr<Planner> Planner::CreateInstance(DrmDevice *) {
   std::unique_ptr<Planner> planner(new Planner);
-  planner->AddStage<PlanStageStm32mpu>();
+  planner->AddStage<PlanStageGreedy>();
   return planner;
 }
 #endif

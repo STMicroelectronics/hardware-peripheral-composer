@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright (C) 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "hwc-platform-drm-stm32mpu"
+#define LOG_TAG "hwc-bufferinfo-stm32mpu"
 
-#include "platformstm32mpu.h"
+#include "BufferInfoStm32mpu.h"
 
 #include <drm/drm_fourcc.h>
 #include <xf86drm.h>
@@ -29,35 +29,20 @@
 
 namespace android {
 
-#ifdef USE_STM32MPU_IMPORTER
-// static
-Importer *Importer::CreateInstance(DrmDevice *drm) {
-  DrmStm32mpuImporter *importer = new DrmStm32mpuImporter(drm);
-  if (!importer)
-    return NULL;
+LEGACY_BUFFER_INFO_GETTER(BufferInfoStm32mpu);
 
-  int ret = importer->Init();
-  if (ret) {
-    ALOGE("Failed to initialize the STM32MPU importer %d", ret);
-    delete importer;
-    return NULL;
-  }
-  return importer;
-}
-#endif
-
-uint32_t DrmStm32mpuImporter::ConvertHalFormatToDrm(uint32_t hal_format) {
+uint32_t BufferInfoStm32mpu::ConvertHalFormatToDrm(uint32_t hal_format) {
   switch (hal_format) {
     case HAL_PIXEL_FORMAT_RGB_888:
-      return DRM_FORMAT_RGB888;
+      return DRM_FORMAT_BGR888;
     case HAL_PIXEL_FORMAT_BGRA_8888:
       return DRM_FORMAT_ARGB8888;
     case HAL_PIXEL_FORMAT_RGBX_8888:
-      return DRM_FORMAT_XRGB8888;
+      return DRM_FORMAT_XBGR8888;
     case HAL_PIXEL_FORMAT_RGBA_8888:
-      return DRM_FORMAT_ARGB8888;
+      return DRM_FORMAT_ABGR8888;
     case HAL_PIXEL_FORMAT_RGB_565:
-      return DRM_FORMAT_RGB565;
+      return DRM_FORMAT_BGR565;
     case HAL_PIXEL_FORMAT_YV12:
       return DRM_FORMAT_YVU420;
     default:
@@ -66,7 +51,7 @@ uint32_t DrmStm32mpuImporter::ConvertHalFormatToDrm(uint32_t hal_format) {
   }
 }
 
-uint32_t DrmStm32mpuImporter::HalFormatToBitsPerPixel(uint32_t hal_format)
+uint32_t BufferInfoStm32mpu::HalFormatToBitsPerPixel(uint32_t hal_format)
 {
     uint32_t bpp;
 
@@ -93,38 +78,32 @@ uint32_t DrmStm32mpuImporter::HalFormatToBitsPerPixel(uint32_t hal_format)
     return bpp;
 }
 
-int DrmStm32mpuImporter::ConvertBoInfo(buffer_handle_t handle, hwc_drm_bo_t *bo) {
+auto BufferInfoStm32mpu::GetBoInfo(buffer_handle_t handle)
+    -> std::optional<BufferInfo> {
 
   private_handle_t *gr_handle = (private_handle_t*)handle;
   if (!gr_handle)
-    return -EINVAL;
+    return {};
 
-  memset(bo, 0, sizeof(hwc_drm_bo_t));
+  BufferInfo bi{};
 
   /* Extra bits are responsible for buffer compression and memory layout */
   if (gr_handle->format & ~0x10f) {
     ALOGV("Special buffer formats are not supported");
-    return -EINVAL;
+    return {};
   }
 
-  bo->width = gr_handle->width;
-  bo->height = gr_handle->height;
-  bo->format = ConvertHalFormatToDrm(gr_handle->format);
+  bi.width = gr_handle->width;
+  bi.height = gr_handle->height;
+  bi.format = ConvertHalFormatToDrm(gr_handle->format);
 
   uint32_t bpp = HalFormatToBitsPerPixel(gr_handle->format);
-  bo->pitches[0] = gr_handle->stride * bpp;
+  bi.pitches[0] = gr_handle->stride * bpp;
 
-  bo->prime_fds[0] = gr_handle->fd;
-  bo->offsets[0] = 0;
+  bi.prime_fds[0] = gr_handle->fd;
+  bi.offsets[0] = 0;
 
-  return 0;
+  return bi;
 }
 
-#ifdef USE_STM32MPU_IMPORTER
-std::unique_ptr<Planner> Planner::CreateInstance(DrmDevice *) {
-  std::unique_ptr<Planner> planner(new Planner);
-  planner->AddStage<PlanStageGreedy>();
-  return planner;
-}
-#endif
-}
+}  // namespace android

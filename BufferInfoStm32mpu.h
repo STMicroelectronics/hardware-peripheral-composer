@@ -14,20 +14,17 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_PLATFORM_DRM_STM32MPU_H_
-#define ANDROID_PLATFORM_DRM_STM32MPU_H_
+#ifndef BUFFERINFO_STM32MPU_H_
+#define BUFFERINFO_STM32MPU_H_
 
-#include "drmdevice.h"
-#include "platform.h"
-#include "platformdrmgeneric.h"
+#include "bufferinfo/BufferInfoGetter.h"
 
 namespace android {
 
-class DrmStm32mpuImporter : public DrmGenericImporter {
+class BufferInfoStm32mpu : public LegacyBufferInfoGetter {
  public:
-  using DrmGenericImporter::DrmGenericImporter;
-
-  int ConvertBoInfo(buffer_handle_t handle, hwc_drm_bo_t *bo) override;
+  using LegacyBufferInfoGetter::LegacyBufferInfoGetter;
+  auto GetBoInfo(buffer_handle_t handle) -> std::optional<BufferInfo> override;
 
  private:
   uint32_t ConvertHalFormatToDrm(uint32_t hal_format);

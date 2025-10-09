@@ -42,7 +42,7 @@ uint32_t BufferInfoStm32mpu::ConvertHalFormatToDrm(uint32_t hal_format) {
     case HAL_PIXEL_FORMAT_RGBA_8888:
       return DRM_FORMAT_ABGR8888;
     case HAL_PIXEL_FORMAT_RGB_565:
-      return DRM_FORMAT_BGR565;
+      return DRM_FORMAT_RGB565; // no swap: VSI HW constraints
     case HAL_PIXEL_FORMAT_YV12:
       return DRM_FORMAT_YVU420;
     default:
